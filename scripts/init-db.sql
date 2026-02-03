@@ -15,7 +15,10 @@ CREATE TABLE IF NOT EXISTS users (
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_user') THEN
-    CREATE ROLE app_user LOGIN PASSWORD 'app_password_change_me';
+    CREATE ROLE app_user LOGIN;
+    -- Pas de mot de passe en dur dans le repo.
+    -- Définir le mot de passe via une commande admin (voir README) :
+    --   ALTER ROLE app_user WITH PASSWORD '<ton_mdp>';
   END IF;
 END $$;
 

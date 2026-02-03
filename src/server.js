@@ -1,5 +1,12 @@
 require('dotenv').config();
 
+if (process.env.NODE_ENV !== 'test') {
+  if (!process.env.JWT_SECRET) {
+    // eslint-disable-next-line no-console
+    console.error('FATAL: JWT_SECRET is missing. Refusing to start.');
+    process.exit(1);
+  }
+}
 // Tracing must be initialized before importing the rest (auto-instrumentations)
 const { initTracing } = require('./observability/tracing');
 initTracing();

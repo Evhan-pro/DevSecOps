@@ -11,10 +11,9 @@ const tracer = getTracer();
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
-  // Fail-safe: refuse to start without secret in non-test env
   if (process.env.NODE_ENV !== 'test') {
-    // eslint-disable-next-line no-console
-    console.error('JWT_SECRET is missing');
+    console.error('FATAL: JWT_SECRET is missing. Refusing to continue.');
+    process.exit(1);
   }
 }
 
