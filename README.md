@@ -1,213 +1,118 @@
-# 🚨 API DevSecOps - Jour 1
+# DevSecOps API — Node.js & PostgreSQL
 
-> API volontairement vulnérable pour l'apprentissage DevSecOps
+## 📌 Présentation du projet
 
-⚠️ **ATTENTION** : Cette application contient des vulnérabilités de sécurité **INTENTIONNELLES** à des fins pédagogiques.
-**NE JAMAIS déployer en production !**
+Ce repository contient une **API Node.js sécurisée** avec PostgreSQL, pensée pour illustrer une **démarche DevSecOps complète**.
 
----
+Le projet met en œuvre :
 
-## ✅ Version sécurisée (rendu DevSecOps)
+-   une authentification sécurisée (JWT, bcrypt),
+-   des contrôles d’autorisation (RBAC),
+-   des bonnes pratiques de sécurité applicative,
+-   une orchestration des contrôles DevSecOps via `Taskfile`,
+-   une couche d’observabilité (logs, métriques, traces),
+-   et un **dashboard local** pour lancer et visualiser les tests.
 
-Cette branche/rendu corrige les vulnérabilités du J1, ajoute une authentification JWT sécurisée, des tests unitaires orientés sécurité, une pipeline DevSecOps via `Taskfile.yml`, et une stratégie d'observabilité.
+L’objectif est de disposer d’un socle API **sécurisé, testable et automatisé**, utilisable en local comme en CI.
 
-### Observabilité
+## 🗂️ Organisation du repository
 
-- Logs JSON structurés (Pino) avec `x-request-id`
-- Metrics Prometheus sur `/metrics`
-- **Bonus traces** : OpenTelemetry (HTTP/Express) + spans custom sur `login/register/download`
+-   `src/`
+-   Code de l’API (routes, auth, accès base de données, sécurité, observabilité).
+-   `tests/`
+-   Tests unitaires et tests orientés sécurité.
+-   `scripts/`
+-   Scripts d’initialisation et helpers (SQL, setup).
+-   `uploads/`
+-   Dossier sandbox pour les fichiers téléchargeables.
+-   `Taskfile.yml`
+-   Point central DevSecOps : toutes les tâches (tests, scans, audits, phases).
+-   `docker-compose.yml`
+-   Stack locale (API + PostgreSQL).
+-   `tools/test-dashboard/`
+-   Dashboard web local pour lancer les tâches DevSecOps.
 
-#### Traces OpenTelemetry (bonus)
+## ✅ Prérequis
 
-Par défaut, les traces sont exportées en console.
+-   Node.js **\>= 18**
+-   Docker + Docker Compose
+-   go-task (`task`) installé
 
-Pour une UI :
+Vérification rapide :
 
-```bash
-task otel:up
-```
+node -v
+docker -v
+docker compose version
+task --version
 
-Puis passe `OTEL_EXPORTER=otlp` dans `.env` et ouvre Jaeger : http://localhost:16686
+## ⚙️ Mise en place du projet
 
+### 1\. Configuration de l’environnement
 
-## 🎯 Objectifs pédagogiques
+cp .env.example .env
 
-1. Identifier les vulnérabilités courantes dans une API
-2. Comprendre les attaques (SQL Injection, Path Traversal, etc.)
-3. Apprendre à sécuriser le code
-4. Configurer git-secrets pour prévenir les commits de secrets
+Adapter si besoin les variables (DB, JWT, observabilité).
 
-## 📋 Prérequis
+### 2\. Lancer la stack Docker
 
-- Node.js >= 14
-- npm ou yarn
-- Docker & Docker Compose
-- git
+docker compose up -d
 
-## 🚀 Installation
+Cela démarre :
 
-```bash
-# 1. Cloner le dépôt
-git clone <url-du-repo>
-cd demo-devsecops-api-j1
+-   PostgreSQL
+-   l’API Node.js
 
-# 2. Lancer PostgreSQL avec Docker Compose
-docker-compose up -d
+### 3\. Installer les dépendances
 
-# Attendre que la base de données soit prête (5-10 secondes)
-# Vous pouvez vérifier avec :
-docker-compose logs postgres
-
-# 3. Installer les dépendances Node.js
 npm install
 
-# 4. Lancer le serveur en mode développement
+### 4\. Lancer l’API en développement
+
 npm run dev
-```
 
-Le serveur démarre sur : http://localhost:3000
-La base de données PostgreSQL est accessible sur : localhost:5432
+Accès :
 
-## 🧪 Tester l'API
+-   API : [http://localhost:3000](http://localhost:3000)
+-   Base de données : localhost:5432
 
-### Méthode 1 : REST Client (VSCode - recommandé)
+## 🧪 Dashboard de tests DevSecOps
 
-1. Installer l'extension **REST Client** dans VSCode (ID: `humao.rest-client`)
-2. Ouvrir le fichier `api-tests.http`
-3. Cliquer sur **"Send Request"** au-dessus de chaque requête
+### 🎯 À quoi sert le dashboard ?
 
-### Méthode 2 : Script curl (terminal)
+Le dashboard est une **interface web locale** permettant de :
 
-```bash
-# Rendre le script exécutable (une seule fois)
-chmod +x curl-examples.sh
+-   lancer les tâches définies dans le `Taskfile.yml`,
+-   éviter de passer par la ligne de commande,
+-   visualiser en temps réel les sorties des tests et scans,
+-   avoir un aperçu rapide de l’état du projet (succès / erreurs).
 
-# Lancer le menu interactif
-./curl-examples.sh
+Il agit comme une **surcouche UX** au pipeline DevSecOps local.
 
-# Ou exécuter une fonction spécifique
-./curl-examples.sh login_sqli
-./curl-examples.sh file_traversal_package
-./curl-examples.sh user_privilege_escalation
-```
+### 📁 Emplacement
 
-### Méthode 3 : curl manuel
+tools/test-dashboard/
 
-Voir les exemples dans le fichier `curl-examples.sh` ou `api-tests.http`.
+### ▶️ Lancer le dashboard
 
-## 🛑 Arrêter les services
+node tools/test-dashboard/server.js
 
-```bash
-# Arrêter le serveur Node.js
-Ctrl+C
+### 🌐 Accès
 
-# Arrêter et supprimer la base de données
-docker-compose down -v
-```
+Ouvrir dans le navigateur :
 
-## 📚 Endpoints disponibles
+http://localhost:5050
 
-### 1. Documentation
-```
-GET /
-```
-Retourne la liste des endpoints et des exercices.
+### 🧠 Fonctionnement
 
-### 2. Login
-```
-POST /api/auth/login
-Content-Type: application/json
+Depuis l’interface, tu peux :
 
-{
-  "username": "admin",
-  "password": "password123"
-}
-```
+-   lancer les tests unitaires,
+-   exécuter les scans de sécurité,
+-   déclencher des phases complètes du pipeline,
+-   consulter les logs et résultats en direct.
 
-**Exercice :** Analysez le code de `src/auth/login.js` et essayez de vous connecter en tant qu'admin sans connaître le mot de passe.
+Le dashboard appelle directement les commandes `task` définies dans le projet.
 
-### 3. Files
-```
-GET /api/files?name=photo.jpg
-```
+## 🛑 Arrêter le projet
 
-**Exercice :** Analysez le code de `src/api/files.js` et essayez d'accéder à des fichiers en dehors du dossier `uploads/`.
-
-### 4. Users (Challenge)
-```
-POST /api/users
-Content-Type: application/json
-
-{
-  "email": "user@example.com",
-  "password": "mypassword",
-  "role": "user"
-}
-```
-
-**Challenge :** Analysez le code de `src/api/users.js` et trouvez TOUTES les vulnérabilités.
-
-## 🔍 Exercices pratiques
-
-### Exercice 1 : Analyse de code
-
-Lisez les fichiers suivants et identifiez les vulnérabilités :
-
-1. `src/auth/login.js` - Endpoint de login
-2. `src/config/database.js` - Configuration DB
-3. `src/api/files.js` - Endpoint de téléchargement
-4. `src/api/users.js` - Endpoint de création d'utilisateurs (CHALLENGE)
-
-### Exercice 2 : Exploitation
-
-Une fois les vulnérabilités identifiées, essayez de les exploiter avec curl ou Postman.
-
-**Objectifs :**
-- Contournez l'authentification sur `/api/auth/login`
-- Accédez à des fichiers sensibles via `/api/files`
-- Créez un utilisateur avec des privilèges élevés via `/api/users`
-
-### Exercice 3 : Configuration de git-secrets
-
-```bash
-# 1. Installer git-secrets
-brew install git-secrets  # macOS
-# ou suivre les instructions : https://github.com/awslabs/git-secrets
-
-# 2. Initialiser dans le repo
-git secrets --install
-
-# 3. Ajouter les patterns AWS
-git secrets --register-aws
-
-# 4. Ajouter des patterns personnalisés
-git secrets --add 'sk_live_[a-zA-Z0-9]{24}'
-git secrets --add 'ghp_[a-zA-Z0-9]{36}'
-git secrets --add 'JWT_SECRET.*=.*(secret|password|123)'
-
-# 5. Tester
-echo "const API_KEY = 'AKIAIOSFODNN7EXAMPLE';" > test.js
-git add test.js
-git commit -m "test"  # Devrait être bloqué !
-```
-
-### Exercice 4 : Scanner l'historique
-```bash
-# Scanner tout l'historique pour détecter des secrets déjà commités
-git secrets --scan-history
-```
-
-## 📖 Ressources
-
-- [OWASP Top 10 - 2025](https://owasp.org/Top10/2025/)
-- [OWASP Cheat Sheet Series](https://cheatsheetseries.owasp.org/)
-- [SQL Injection Prevention](https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html)
-- [git-secrets](https://github.com/awslabs/git-secrets)
-
-## 🤝 Support
-
-Pour toute question sur les exercices, contactez l'équipe pédagogique.
-
-## ⚖️ Licence
-
-MIT - À des fins éducatives uniquement
+docker compose down -v
