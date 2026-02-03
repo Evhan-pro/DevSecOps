@@ -113,6 +113,16 @@ Depuis l’interface, tu peux :
 
 Le dashboard appelle directement les commandes `task` définies dans le projet.
 
+## 🛡️ DAST (OWASP ZAP) — volontairement désactivé par défaut
+
+Par défaut, la task `dast` **ne bloque pas** le pipeline local : elle affiche un message et sort en succès. C'est volontaire pour éviter de faire échouer tout le monde quand l'environnement (Docker, staging) n'est pas prêt.
+
+✅ Pour l'activer :
+```bash
+export ENABLE_DAST=1
+task dast
+
+
 ## 🛑 Arrêter le projet
 
 docker compose down -v
