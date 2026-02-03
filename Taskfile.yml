@@ -1,0 +1,192 @@
+version: '3'
+
+dotenv: ['.env']
+
+vars:
+  APP_PORT: '{{.APP_PORT | default (env "PORT" | default "3000")}}'
+  BASE_URL: '{{.BASE_URL | default (printf "http://localhost:%s" .APP_PORT)}}'
+  SONAR_URL: '{{.SONAR_URL | default (env "SONAR_URL" | default "http://localhost:9000")}}'
+
+tasks:
+  # ---------------------------
+  # Helpers
+  # ---------------------------
+  _ensure_cmd:
+    internal: true
+    cmds:
+      - |
+        command -v {{.CLI}} >/dev/null 2>&1 || { echo "❌ Missing {{.CLI}}"; exit 1; }
+
+  # ---------------------------
+  # Install / Dev
+  # ---------------------------
+  install:
+    desc: Install dependencies (clean)
+    cmds:
+      - npm install
+
+  dev:
+    desc: Run API in dev mode
+    deps: [install]
+    cmds:
+      - npm run dev
+
+  # ---------------------------
+  # Observability (BONUS traces)
+  # ---------------------------
+  otel:up:
+    desc: Start Jaeger (OTLP HTTP) for traces
+    cmds:
+      - docker compose -f docker-compose-otel.yml up -d
+
+  otel:down:
+    desc: Stop Jaeger
+    cmds:
+      - docker compose -f docker-compose-otel.yml down
+
+  # ---------------------------
+  # Database
+  # ---------------------------
+  db:up:
+    desc: Start PostgreSQL with docker-compose
+    cmds:
+      - docker compose up -d postgres
+
+  db:down:
+    desc: Stop PostgreSQL
+    cmds:
+      - docker compose down
+
+  db:logs:
+    desc: Follow postgres logs
+    cmds:
+      - docker logs -f devsecops-db
+
+  db:wait:
+    desc: Wait for postgres healthcheck
+    cmds:
+      - |
+        for i in {1..30}; do
+          if docker exec devsecops-db pg_isready -U root -d myapp >/dev/null 2>&1; then
+            echo "✅ postgres ready"; exit 0;
+          fi
+          echo "⏳ waiting postgres..."; sleep 1;
+        done
+        echo "❌ postgres not ready"; exit 1
+
+  db:init:
+    desc: Apply init sql (use ADMIN_DATABASE_URL if needed)
+    deps: [install]
+    cmds:
+      - node scripts/init-db.js
+
+  # ---------------------------
+  # Quality
+  # ---------------------------
+  lint:
+    desc: ESLint
+    deps: [install]
+    cmds:
+      - npm run lint
+
+  test:
+    desc: Unit tests
+    deps: [install]
+    cmds:
+      - npm test
+
+  build:
+    desc: Build step (placeholder - Node API)
+    deps: [install]
+    cmds:
+      - node -c src/server.js
+
+  # ---------------------------
+  # Security checks
+  # ---------------------------
+  secrets:
+    desc: Scan secrets (trufflehog)
+    cmds:
+      - task: _ensure_cmd
+        vars: { CLI: trufflehog }
+      - trufflehog filesystem . --no-update --exclude-paths .trufflehogignore || true
+
+  sca:
+    desc: SCA (Trivy FS)
+    cmds:
+      - task: _ensure_cmd
+        vars: { CLI: trivy }
+      - trivy fs --scanners vuln,secret,misconfig .
+
+  sast:
+    desc: SAST (SonarQube)
+    deps: [install]
+    cmds:
+      - task: _ensure_cmd
+        vars: { CLI: sonar-scanner }
+      - |
+        if [ -z "${SONAR_TOKEN:-}" ]; then
+          echo "❌ SONAR_TOKEN missing (see .env.example)"; exit 1;
+        fi
+      - sonar-scanner -Dsonar.host.url={{.SONAR_URL}} -Dsonar.login=${SONAR_TOKEN}
+
+  # ZAP DAST: requires staging running
+  dast:
+    desc: DAST (OWASP ZAP baseline) against BASE_URL
+    cmds:
+      - |
+        if [ "${ENABLE_DAST:-0}" != "1" ]; then
+          echo "ℹ️  DAST skipped (set ENABLE_DAST=1 and ensure Docker is available)";
+          exit 0;
+        fi
+      - task: _ensure_cmd
+        vars: { CLI: docker }
+      - |
+        docker run --rm -t owasp/zap2docker-stable zap-baseline.py \
+          -t {{.BASE_URL}} \
+          -r zap_report.html || true
+        echo "📝 DAST report generated: zap_report.html"
+
+  # ---------------------------
+  # Phases (lifecycle)
+  # ---------------------------
+  pre-commit:
+    desc: Pre-commit gate (fast)
+    cmds:
+      - task: secrets
+      - task: lint
+      - task: test
+
+  branch-feature:
+    desc: Feature branch gate (fast CI)
+    cmds:
+      - task: lint
+      - task: test
+      - task: build
+
+  pull-request:
+    desc: PR gate (quality + security)
+    cmds:
+      - task: branch-feature
+      - task: sca
+      - task: sast
+
+  staging:
+    desc: Staging gate (deploy + DAST + smoke)
+    cmds:
+      - task: pull-request
+      - 'echo "ℹ️  Intention: deploy to staging environment (not provided in this repo)"'
+      - task: dast
+
+  production:
+    desc: Production gate (safe)
+    cmds:
+      - task: staging
+      - 'echo "ℹ️  Intention: prod deploy + smoke + rollback plan (out of scope for this repo)"'
+
+  nightly:
+    desc: Nightly (heavier scans)
+    cmds:
+      - task: sca
+      - task: dast
+      - task: sast

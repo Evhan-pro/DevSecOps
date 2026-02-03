@@ -1,0 +1,66 @@
+stages:
+  - precommit
+  - feature
+  - pr
+  - staging
+  - production
+  - nightly
+
+image: node:22-alpine
+
+variables:
+  NODE_ENV: test
+
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - node_modules/
+
+before_script:
+  - npm ci || npm install
+  - |
+    # Install Task (go-task) lightweight (linux)
+    apk add --no-cache curl bash
+    sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
+
+precommit:
+  stage: precommit
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+  script:
+    - task pre-commit
+
+feature:
+  stage: feature
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+  script:
+    - task branch-feature
+
+pr:
+  stage: pr
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  script:
+    - task pull-request
+
+staging:
+  stage: staging
+  rules:
+    - if: $CI_COMMIT_BRANCH == "staging"
+  script:
+    - task staging
+
+production:
+  stage: production
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  script:
+    - task production
+
+nightly:
+  stage: nightly
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  script:
+    - task nightly

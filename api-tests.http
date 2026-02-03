@@ -1,0 +1,127 @@
+### API DevSecOps - Tests
+### Installation extension VSCode : REST Client (humao.rest-client)
+### Utilisation : Cliquer sur "Send Request" au-dessus de chaque requête
+
+@baseUrl = http://localhost:3000
+
+# IMPORTANT : ce fichier suppose l'extension VSCode "REST Client"
+# Il capture automatiquement le token depuis la réponse de login.
+
+###############################################################################
+# 0. Auth (register + login)
+###############################################################################
+
+### @name login_admin
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "admin123"
+}
+
+@token = {{login_admin.response.body.token}}
+
+###############################################################################
+# 1. Health Check
+###############################################################################
+
+### GET Health Check
+GET {{baseUrl}}/api/health
+
+###############################################################################
+# 2. Login (anti-injection)
+###############################################################################
+
+### POST Login - Tentative SQLi (doit échouer)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin' --",
+  "password": "nimportequoi"
+}
+
+###############################################################################
+# 3. Files (Path Traversal)
+###############################################################################
+
+### GET File - Légitime (photo.jpg)
+GET {{baseUrl}}/api/files?name=photo.jpg
+Authorization: Bearer {{token}}
+
+### GET File - Légitime (document.pdf)
+GET {{baseUrl}}/api/files?name=document.pdf
+Authorization: Bearer {{token}}
+
+### GET File - Path Traversal (package.json)
+GET {{baseUrl}}/api/files?name=../package.json
+Authorization: Bearer {{token}}
+
+### GET File - Path Traversal (.env.example)
+GET {{baseUrl}}/api/files?name=../.env.example
+Authorization: Bearer {{token}}
+
+### GET File - Path Traversal (database.js)
+GET {{baseUrl}}/api/files?name=../src/config/database.js
+Authorization: Bearer {{token}}
+
+### GET File - Path Traversal (secrets examples)
+GET {{baseUrl}}/api/files?name=../SECRETS_EXAMPLES.md
+Authorization: Bearer {{token}}
+Authorization: Bearer {{token}}
+
+###############################################################################
+# 4. Users (CHALLENGE - 7 vulnérabilités)
+###############################################################################
+
+### POST Create User - Normal
+POST {{baseUrl}}/api/users
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "email": "test@example.com",
+  "password": "testpassword",
+  "role": "user"
+}
+
+### POST Create User - Privilege Escalation (se donner le rôle admin)
+POST {{baseUrl}}/api/users
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "email": "hacker@evil.com",
+  "password": "test",
+  "role": "admin"
+}
+
+### POST Create User - SQL Injection dans email
+POST {{baseUrl}}/api/users
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "email": "hacker', 'hacker@evil.com', 'hacked123', 'admin'); --",
+  "password": "test",
+  "role": "user"
+}
+
+### POST Create User - Email invalide (pas de validation)
+POST {{baseUrl}}/api/users
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "email": "pas-un-email",
+  "password": "x",
+  "role": "superadmin"
+}
+
+###############################################################################
+# 5. Documentation
+###############################################################################
+
+### GET Documentation (liste des endpoints)
+GET {{baseUrl}}/
